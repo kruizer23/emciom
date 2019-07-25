@@ -40,6 +40,10 @@ import logging
 import argparse
 import os
 import subprocess
+import smtplib
+import email
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 
 # ***************************************************************************************
@@ -49,6 +53,7 @@ import subprocess
 RESULT_OK = 0
 RESULT_ERROR_CONFIG_FILE_NOT_PRESENT = 1
 RESULT_ERROR_CONFIG_FILE_EMPTY = 2
+RESULT_ERROR_CANNOT_SEND_EMAIL = 3
 
 
 # ***************************************************************************************
@@ -130,8 +135,10 @@ def main():
     # Send the captured command output by e-mail, if it is not empty.
     if result == RESULT_OK:
         if cmd_output:
-            # TODO Implement e-mailing part here...
-            print ('\n'.join(cmd_output))
+            # Send the e-mail.
+            if not send_email(cfg_email_to, cfg_email_from, args.email_subject, '\n'.join(cmd_output)):
+                logging.debug('Unabe to send email to {}'.format(cfg_email_to))
+                result = RESULT_ERROR_CANNOT_SEND_EMAIL
 
     # Give the exit code back to the caller
     return result
@@ -161,6 +168,44 @@ def run_command_with_output_capture(command):
     result = stdout.decode('utf-8').splitlines()
 
     # Give the result back to the caller
+    return result
+
+
+def send_email(recipient, sender, subject, content):
+    """
+    Sends an e-mail message. This assumes a mail transfer agent such as postfix is
+    installed on the system.
+
+    :param recipient: The e-mail address to send the message to.
+    :param sender: The e-mail address of the sender.
+    :param subject: The subject of the message.
+    :param content: The content of the message.
+
+
+    :returns: True if successful, False otherwise.
+    :rtype: bool
+    """
+    result = True
+
+    # Construct the message.
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = recipient
+    msg['Date'] = email.utils.formatdate(localtime=True)
+    msg['Subject'] = subject
+    msg.attach(MIMEText(content))
+
+    # Send the message.
+    try:
+        smtp = smtplib.SMTP('localhost')
+        smtp.sendmail(sender, [recipient], msg.as_string())
+    except email.SMTPException:
+        result = False
+
+    # Make sure the connection is closed.
+    smtp.close()
+
+    # Give the result back to the caller.
     return result
 
 

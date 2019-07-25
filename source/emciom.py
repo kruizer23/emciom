@@ -38,6 +38,7 @@ __docformat__ = 'reStructuredText'
 # ***************************************************************************************
 import logging
 import argparse
+import subprocess
 
 
 # ***************************************************************************************
@@ -88,8 +89,37 @@ def main():
         logging.basicConfig(level=logging.DEBUG)
 
     # TODO Implement program here...
+    output = run_command_with_output_capture('cat emciom.py | tail -10')
+    print ('\n'.join(output))
 
     # Give the exit code back to the caller
+    return result
+
+
+def run_command_with_output_capture(command):
+    """
+    Runs the command specified in the command-parameters, captures and returns the
+    output that the command generated.
+
+    :param command: The command to run, e.g. 'ls -l'.
+
+    :returns: A list of strings with the captured output
+    :rtype: list of str
+    """
+    result = ""
+    proc_ran_okay = True
+
+    try:
+        proc = subprocess.Popen(command, shell=True, stdin=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        proc.wait()
+    except Exception as error:
+        proc_ran_okay = False
+
+    # Get the captured output and convert it to a list of strings.
+    result = stdout.decode('utf-8').splitlines()
+
+    # Give the result back to the caller
     return result
 
 

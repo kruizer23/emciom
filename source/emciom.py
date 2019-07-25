@@ -38,6 +38,7 @@ __docformat__ = 'reStructuredText'
 # ***************************************************************************************
 import logging
 import argparse
+import os
 import subprocess
 
 
@@ -46,6 +47,8 @@ import subprocess
 # ***************************************************************************************
 # Program return codes.
 RESULT_OK = 0
+RESULT_ERROR_CONFIG_FILE_NOT_PRESENT = 1
+RESULT_ERROR_CONFIG_FILE_EMPTY = 2
 
 
 # ***************************************************************************************
@@ -88,9 +91,47 @@ def main():
     if args.debug_enabled:
         logging.basicConfig(level=logging.DEBUG)
 
-    # TODO Implement program here...
-    output = run_command_with_output_capture('cat emciom.py | tail -10')
-    print ('\n'.join(output))
+    # Check if the configuration file is actually there
+    if result == RESULT_OK:
+        config_file_present = os.path.isfile(args.config_file)
+        if not config_file_present:
+            logging.debug('Config file is not present: {}'.format(args.config_file))
+            result = RESULT_ERROR_CONFIG_FILE_NOT_PRESENT
+
+    # Read the lines of the configuration file into a list of strings
+    if result == RESULT_OK:
+        # Note that the file is automatically closed when using the 'with' construct.
+        with open(args.config_file) as config_file_obj:
+            cmd_lines = config_file_obj.read().splitlines()
+        # Check that at least some data was read from the config file.
+        if not cmd_lines:
+            logging.debug('No lines read from the configuration file {}'.format(args.config_file))
+            result = RESULT_ERROR_CONFIG_FILE_EMPTY
+        # Otherwise, remove empty lines and remove leading and trailing whitespaces from each line.
+        else:
+            cmd_lines = [cmd_line.strip() for cmd_line in cmd_lines if cmd_line.strip()]
+
+    # Run the commands one at a time and capture the output.
+    if result == RESULT_OK:
+        cmd_output = list()
+        for cmd in cmd_lines:
+            # Add the command itself to the output, following by a separator line.
+            cmd_output.append('================================================================================')
+            cmd_output.append('Command: ' + cmd)
+            cmd_output.append('--------------------------------------------------------------------------------')
+            # Add the output of the actual command.
+            current_cmd_output = run_command_with_output_capture(cmd)
+            for output_line in current_cmd_output:
+                cmd_output.append(output_line)
+            # Add an end of command output separator.
+            cmd_output.append('================================================================================')
+            cmd_output.append('')
+
+    # Send the captured command output by e-mail, if it is not empty.
+    if result == RESULT_OK:
+        if cmd_output:
+            # TODO Implement e-mailing part here...
+            print ('\n'.join(cmd_output))
 
     # Give the exit code back to the caller
     return result
